@@ -11,7 +11,7 @@ Automatically adds issues and PRs to the [RequestNetwork project board](https://
 **Behavior:**
 - Issues: Always added to project when opened
 - PRs without linked issues: Added to project when opened
-- PRs with linked issues (via `Fixes #X` or `Closes #X`): NOT added (the linked issue is tracked instead)
+- PRs with linked issues: NOT added (the linked issue is tracked instead)
 
 **Usage:** Add this caller workflow to your repo at `.github/workflows/auto-project.yml`:
 
