@@ -96,9 +96,7 @@ jobs:
               if (stillLinked) verifiedOpenPRs.push(pr);
             }
 
-            const uniqueOpenPRs = verifiedOpenPRs;
-
-            if (uniqueOpenPRs.length > 0) {
+            if (verifiedOpenPRs.length > 0) {
               await github.rest.issues.update({
                 owner,
                 repo,
@@ -106,10 +104,10 @@ jobs:
                 state: 'open'
               });
 
-              const prList = uniqueOpenPRs.map(pr =>
+              const prList = verifiedOpenPRs.map(pr =>
                 `- ${pr.repository.nameWithOwner}#${pr.number}: ${pr.title}`
               ).join('\n');
-              console.log(`Reopened issue #${issueNumber} - ${uniqueOpenPRs.length} PRs still open:\n${prList}`);
+              console.log(`Reopened issue #${issueNumber} - ${verifiedOpenPRs.length} PRs still open:\n${prList}`);
             } else {
               console.log(`Issue #${issueNumber} stays closed - no open PRs found`);
             }
