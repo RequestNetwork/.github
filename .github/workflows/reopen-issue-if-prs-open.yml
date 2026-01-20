@@ -1,0 +1,113 @@
+name: Reopen Issue If PRs Still Open
+
+on:
+  workflow_call:
+    secrets:
+      token:
+        required: true
+        description: 'Token with repo scope for org-wide PR search'
+
+jobs:
+  check-and-reopen:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for open PRs and reopen issue
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.token }}
+          script: |
+            const issueNumber = context.payload.issue.number;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            // Use GraphQL to get PRs linked via UI "Development" section
+            const query = `
+              query($owner: String!, $repo: String!, $number: Int!) {
+                repository(owner: $owner, name: $repo) {
+                  issue(number: $number) {
+                    timelineItems(itemTypes: [CONNECTED_EVENT, CROSS_REFERENCED_EVENT], first: 100) {
+                      nodes {
+                        ... on ConnectedEvent {
+                          subject {
+                            ... on PullRequest {
+                              number
+                              title
+                              state
+                              repository { nameWithOwner }
+                            }
+                          }
+                        }
+                        ... on CrossReferencedEvent {
+                          source {
+                            ... on PullRequest {
+                              number
+                              title
+                              state
+                              repository { nameWithOwner }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            `;
+
+            const result = await github.graphql(query, {
+              owner,
+              repo,
+              number: issueNumber
+            });
+
+            // Extract PR references from timeline (these are candidates, not confirmed)
+            const timelineNodes = result.repository.issue.timelineItems.nodes;
+            const prCandidates = timelineNodes
+              .map(node => node.subject || node.source)
+              .filter(pr => pr && pr.state === 'OPEN');
+
+            // Dedupe by PR number + repo
+            const uniquePRs = [...new Map(
+              prCandidates.map(pr => [`${pr.repository.nameWithOwner}#${pr.number}`, pr])
+            ).values()];
+
+            // Verify each PR still has this issue in closingIssuesReferences
+            const verifiedOpenPRs = [];
+            for (const pr of uniquePRs) {
+              const [prOwner, prRepo] = pr.repository.nameWithOwner.split('/');
+              const verifyQuery = `
+                query($owner: String!, $repo: String!, $number: Int!) {
+                  repository(owner: $owner, name: $repo) {
+                    pullRequest(number: $number) {
+                      closingIssuesReferences(first: 50) {
+                        nodes { number repository { nameWithOwner } }
+                      }
+                    }
+                  }
+                }
+              `;
+              const verifyResult = await github.graphql(verifyQuery, {
+                owner: prOwner, repo: prRepo, number: pr.number
+              });
+              const closingIssues = verifyResult.repository.pullRequest.closingIssuesReferences.nodes;
+              const stillLinked = closingIssues.some(issue =>
+                issue.number === issueNumber && issue.repository.nameWithOwner === `${owner}/${repo}`
+              );
+              if (stillLinked) verifiedOpenPRs.push(pr);
+            }
+
+            if (verifiedOpenPRs.length > 0) {
+              await github.rest.issues.update({
+                owner,
+                repo,
+                issue_number: issueNumber,
+                state: 'open'
+              });
+
+              const prList = verifiedOpenPRs.map(pr =>
+                `- ${pr.repository.nameWithOwner}#${pr.number}: ${pr.title}`
+              ).join('\n');
+              console.log(`Reopened issue #${issueNumber} - ${verifiedOpenPRs.length} PRs still open:\n${prList}`);
+            } else {
+              console.log(`Issue #${issueNumber} stays closed - no open PRs found`);
+            }
