@@ -30,5 +30,5 @@ jobs:
 
 **Requirements:**
 - The `PROJECT_TOKEN` organization secret must be configured with a fine-grained PAT that has:
-  - Repository permissions: `Issues: Read-only`, `Pull requests: Read-only`
+  - Repository permissions: `Issues: Read-only`
   - Organization permissions: `Projects: Read and write`
