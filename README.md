@@ -6,12 +6,11 @@ This repository contains organization-wide GitHub configurations and reusable wo
 
 ### `add-to-project.yml`
 
-Automatically adds issues and PRs to the [RequestNetwork project board](https://github.com/orgs/RequestNetwork/projects/3).
+Automatically adds issues to the [RequestNetwork project board](https://github.com/orgs/RequestNetwork/projects/3).
 
 **Behavior:**
-- Issues: Always added to project when opened
-- PRs without linked issues: Added to project when opened
-- PRs with linked issues: NOT added (the linked issue is tracked instead)
+- Issues: Added to project when opened
+- PRs: NOT added (PRs should be linked to issues, which are tracked instead)
 
 **Usage:** Add this caller workflow to your repo at `.github/workflows/auto-project.yml`:
 
@@ -20,8 +19,6 @@ name: Auto Add to Project
 
 on:
   issues:
-    types: [opened]
-  pull_request:
     types: [opened]
 
 jobs:
@@ -32,4 +29,6 @@ jobs:
 ```
 
 **Requirements:**
-- The `PROJECT_TOKEN` organization secret must be configured with a PAT that has `project` and `repo` scopes
+- The `PROJECT_TOKEN` organization secret must be configured with a fine-grained PAT that has:
+  - Repository permissions: `Issues: Read-only`, `Pull requests: Read-only`
+  - Organization permissions: `Projects: Read and write`

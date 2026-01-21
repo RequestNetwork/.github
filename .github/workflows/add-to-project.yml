@@ -9,53 +9,13 @@ on:
 jobs:
   add-to-project:
     runs-on: ubuntu-latest
+    # Only run for issues, skip PRs entirely
+    if: github.event_name == 'issues'
     steps:
-      - name: Get item info
-        id: item
-        run: |
-          if [ "${{ github.event_name }}" == "issues" ]; then
-            echo "type=issue" >> $GITHUB_OUTPUT
-            echo "node_id=${{ github.event.issue.node_id }}" >> $GITHUB_OUTPUT
-            echo "should_add=true" >> $GITHUB_OUTPUT
-          else
-            echo "type=pr" >> $GITHUB_OUTPUT
-            echo "node_id=${{ github.event.pull_request.node_id }}" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Check for linked issues (PRs only)
-        if: github.event_name == 'pull_request'
-        id: check-linked
+      - name: Add issue to project
         env:
           GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
         run: |
-          LINKED_COUNT=$(gh api graphql -f query='
-            query($owner: String!, $repo: String!, $pr: Int!) {
-              repository(owner: $owner, name: $repo) {
-                pullRequest(number: $pr) {
-                  closingIssuesReferences(first: 10) {
-                    totalCount
-                  }
-                }
-              }
-            }' -f owner="${{ github.repository_owner }}" \
-               -f repo="${{ github.event.repository.name }}" \
-               -F pr=${{ github.event.pull_request.number }} \
-               --jq '.data.repository.pullRequest.closingIssuesReferences.totalCount')
-
-          if [ "$LINKED_COUNT" -eq 0 ]; then
-            echo "should_add=true" >> $GITHUB_OUTPUT
-            echo "No linked issues found, will add PR to project"
-          else
-            echo "should_add=false" >> $GITHUB_OUTPUT
-            echo "PR has $LINKED_COUNT linked issue(s), skipping"
-          fi
-
-      - name: Add to project
-        if: steps.item.outputs.should_add == 'true' || steps.check-linked.outputs.should_add == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
-        run: |
-          # Project ID for RequestNetwork/projects/3
           PROJECT_ID="PVT_kwDOAdsAFs4AIPmg"
 
           gh api graphql -f query='
@@ -67,6 +27,6 @@ jobs:
                 item { id }
               }
             }' -f projectId="$PROJECT_ID" \
-               -f contentId="${{ steps.item.outputs.node_id }}"
+               -f contentId="${{ github.event.issue.node_id }}"
 
-          echo "Added ${{ steps.item.outputs.type }} to project"
+          echo "Added issue to project"
