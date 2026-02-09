@@ -114,6 +114,14 @@ jobs:
               const prList = verifiedOpenPRs.map(pr =>
                 `- ${pr.repository.nameWithOwner}#${pr.number}: ${pr.title}`
               ).join('\n');
+
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: issueNumber,
+                body: `🤖 **Reopened automatically** — this issue still has open PRs linked to it. It will close on its own when all linked PRs are merged or closed.\n\nTo force close this issue, add the \`no-reopen\` label and close it again.`,
+              });
+
               console.log(`Reopened issue #${issueNumber} - ${verifiedOpenPRs.length} PRs still open:\n${prList}`);
             } else {
               console.log(`Issue #${issueNumber} stays closed - no open PRs found`);
